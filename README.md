@@ -1,6 +1,9 @@
 # The Kiibohd Configurator
 
-Client Side Configuration & Flashing Software for Kiibohd compatible keyboards.
+Standalone configuration and flashing software for Kiibohd-compatible keyboards.
+
+See [STANDALONE.md](STANDALONE.md) for the offline trust model, bundled layouts,
+and local sibling firmware repos. Do not use `input.club`.
 
 [![Github Actions Status](https://github.com/kiibohd/configurator/workflows/Release/badge.svg)](https://github.com/kiibohd/configurator/actions)
 
@@ -9,12 +12,15 @@ Client Side Configuration & Flashing Software for Kiibohd compatible keyboards.
 [![Language grade: JavaScript](https://img.shields.io/lgtm/grade/javascript/g/kiibohd/configurator.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/kiibohd/configurator/context:javascript)
 
 
-[![Visit our IRC channel](https://kiwiirc.com/buttons/irc.freenode.net/input.club.png)](https://kiwiirc.com/client/irc.freenode.net/#input.club)
+Default keyboard layouts are bundled in `static/layouts`; the application does not download layouts.
 
 [Visit our Discord Channel](https://discord.gg/GACJa4f)
 
 # --> [Wiki](https://kiibohd.github.io/wiki/#/Quickstart) <-- If you have questions start here
 
+Firmware compilation is intentionally unavailable until a trusted local
+compiler integration is provided. Existing local firmware files can still be
+flashed.
 
 
 ## Supported Keyboards
@@ -35,13 +41,13 @@ You will need to install Zadig drivers (automated through the `Settings > Driver
 ### Linux
 
 * Install dfu-util from your disto's package manager.
-* Add the following to /etc/udev/rules.d/60-input-club.rules (You will need to create the new file)
+* Add the following to `/etc/udev/rules.d/60-kiibohd.rules` (you will need to create the new file).
   ```bash
-  # UDEV Rules for Input Club keyboards
+  # UDEV rules for Kiibohd-compatible keyboards
   #
   # This will allow reflashing via dfu-util without using sudo
   #
-  # This file must be placed /at /etc/udev/rules.d/60-input-club.rules  (preferred location)
+  # This file must be placed at /etc/udev/rules.d/60-kiibohd.rules
 
   # Board
   SUBSYSTEMS=="usb", ATTRS{idVendor}=="1c11", ATTRS{idProduct}=="b04d", MODE="664", GROUP="plugdev"
@@ -69,8 +75,6 @@ yay -Syu kiibohd-configurator-git
 ## Compilation
 
 Only required if there is no release for your distribution.
-
-NOTE: If you run `yarn dev` you will also need to run [KiiConf](https://github.com/kiibohd/KiiConf) locally.
 
 
 ### Requirements

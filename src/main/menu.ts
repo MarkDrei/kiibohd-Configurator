@@ -90,13 +90,6 @@ const template = [
         },
       },
       {
-        label: 'Community Discussions',
-        click: async (): Promise<void> => {
-          const { shell } = await import('electron');
-          await shell.openExternal('https://community.kono.store');
-        },
-      },
-      {
         label: 'Search Issues',
         click: async (): Promise<void> => {
           const { shell } = await import('electron');

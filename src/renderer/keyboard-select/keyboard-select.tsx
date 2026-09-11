@@ -1,5 +1,5 @@
 import React, { useEffect, useState, Fragment } from 'react';
-import { FiberManualRecordIcon, FlashOnIcon, ArrowDownCircleIcon } from '../icons';
+import { FiberManualRecordIcon, FlashOnIcon } from '../icons';
 import { makeStyles, Drawer, List, ListItem, ListItemText, ListItemIcon } from '../mui';
 import {
   released as releasedKeyboardNames,
@@ -8,7 +8,6 @@ import {
 } from '../../common/device/keyboard';
 import { useConnectedKeyboards } from '../hooks';
 import { useCoreState, updateSelectedKeyboard, updateToolbarButtons } from '../state/core';
-import { useSettingsState } from '../state/settings';
 import { QuickFlashButton, SettingsButton, HomeButton, HelpButton } from '../buttons';
 import { pathToImg } from '../common';
 import { tooltipped } from '../utils';
@@ -51,8 +50,6 @@ export default function KeyboardSelect() {
   const classes = useStyles({});
   const connectedKeyboards = useConnectedKeyboards();
   const [hovered, setHovered] = useState<Optional<KeyboardNames>>(undefined);
-  const [firmwareVersions] = useSettingsState('firmwareVersions');
-  const latest = firmwareVersions && firmwareVersions.latest && firmwareVersions.latest.commit;
 
   useEffect(() => {
     updateToolbarButtons(
@@ -96,13 +93,6 @@ export default function KeyboardSelect() {
   function keyboardIcon(attached: AttachedKeyboard) {
     if (!attached.connected) return null;
     if (attached.known && attached.known.isFlashable) return <FlashOnIcon style={{ color: 'green' }} />;
-
-    if (latest && attached.version && attached.version < latest) {
-      return tooltipped(
-        `New firmware version available v${latest}. Currently v${attached.version || '???'}`,
-        <ArrowDownCircleIcon style={{ color: 'green' }} />
-      );
-    }
 
     const icon = <FiberManualRecordIcon style={{ color: 'green' }} />;
 

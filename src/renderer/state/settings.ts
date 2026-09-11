@@ -4,7 +4,7 @@ import { createSharedState } from '../shared-state/index';
 import db from '../db';
 import { findDfuPath } from '../local-storage/dfu-util';
 import { findKiidrvPath } from '../local-storage/kiidrv';
-import { FirmwareVersions, ConfigAnimation } from '../../common/config';
+import { ConfigAnimation } from '../../common/config';
 import { FirmwareResult, normalizeFirmwareResult } from '../local-storage/firmware';
 import { AvailableLocales } from '../../common/keys';
 
@@ -12,43 +12,29 @@ const dev = process.env.NODE_ENV === 'development';
 
 log.setDefaultLevel(dev ? log.levels.INFO : log.levels.ERROR);
 
-// const defaultUri = dev ? 'http://localhost:8080' : 'http://vash.input.club:80';
-const defaultUri = 'http://vash.input.club';
-
 const DbKey = {
   dfuPath: 'dfu-path',
   kiidrvPath: 'kiidrv-path',
   lastDl: 'last-download',
   recentDls: 'recent-dls',
-  lastVerCheck: 'last-version-check',
-  firmwareVersions: 'firmware-versions',
   cannedAnimations: 'canned-animations',
-  uri: dev ? 'uri-development' : 'uri-production',
 };
 
 type SettingsState = {
-  uri: string;
   locale: AvailableLocales;
   dfu: Optional<string>;
   kiidrv: Optional<string>;
   dev: boolean;
-  lastVersionCheck: number;
-  newerVersionAvail: boolean;
-  firmwareVersions: Optional<FirmwareVersions>;
   lastDl: Optional<FirmwareResult>;
   recentDls: Dictionary<FirmwareResult[]>;
   cannedAnimations: Dictionary<ConfigAnimation>;
 };
 
 const initialState: SettingsState = {
-  uri: '',
   locale: 'en-us',
   dev,
   dfu: undefined,
   kiidrv: undefined,
-  lastVersionCheck: 0,
-  newerVersionAvail: false,
-  firmwareVersions: undefined,
   lastDl: undefined,
   recentDls: {},
   cannedAnimations: {},
@@ -68,29 +54,9 @@ export async function loadFromDb() {
   setSettingsState('kiidrv', (await db.core.get(DbKey.kiidrvPath)) || (await findKiidrvPath()));
   setSettingsState('lastDl', normalizeFirmwareResult(await db.core.get(DbKey.lastDl)));
   setSettingsState('recentDls', (await db.core.get(DbKey.recentDls)) || {});
-  setSettingsState('lastVersionCheck', (await db.core.get(DbKey.lastVerCheck)) || 0);
-  setSettingsState('firmwareVersions', (await db.core.get(DbKey.firmwareVersions)) || undefined);
   setSettingsState('cannedAnimations', (await db.core.get(DbKey.cannedAnimations)) || {});
   // setSettingsState('locale', (await db.core.get(DbKey.locale)) || 'en-us');
-  setSettingsState('uri', (await db.core.get(DbKey.uri)) || defaultUri);
   setSettingsState('dfu', (await db.core.get(DbKey.dfuPath)) || (await findDfuPath()));
-}
-
-export async function updateUri(uri: string) {
-  setSettingsState('uri', uri);
-  await db.core.set(DbKey.uri, uri);
-}
-
-export async function updateNewerVersionAvail(newerAvail: boolean) {
-  setSettingsState('newerVersionAvail', newerAvail);
-  const now = Date.now();
-  setSettingsState('lastVersionCheck', now);
-  await db.core.set(DbKey.lastVerCheck, now);
-}
-
-export async function updateFirmwareVersions(versions: FirmwareVersions) {
-  setSettingsState('firmwareVersions', versions);
-  await db.core.set(DbKey.firmwareVersions, versions);
 }
 
 export async function updateDfu(dfu: string) {

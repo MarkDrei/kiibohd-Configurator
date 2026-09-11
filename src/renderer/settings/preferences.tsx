@@ -1,8 +1,5 @@
 import React from 'react';
 import { makeStyles, Card, CardHeader, CardContent, Typography } from '../mui';
-import { useSettingsState, updateUri } from '../state/settings';
-import { ModedTextField } from '../common';
-import { useDevtoolsState } from '../hooks';
 
 const useStyles = makeStyles({
   text: {
@@ -13,15 +10,14 @@ const useStyles = makeStyles({
 
 export default function Preferences() {
   const classes = useStyles({});
-  const isDevToolsOpened = useDevtoolsState();
-  const [uri] = useSettingsState('uri');
 
   return (
     <Card className={classes.card}>
-      <CardHeader title="Advanced" subheader="WARNING: Changing these could cause instability" />
+      <CardHeader title="Standalone mode" />
       <CardContent>
-        {!isDevToolsOpened && <Typography className={classes.text}>Unavailable</Typography>}
-        {isDevToolsOpened && <ModedTextField defaultValue={uri} onSave={updateUri} label="Base URI" />}
+        <Typography className={classes.text}>
+          Keyboard layouts are bundled with the application. Firmware compilation requires a trusted local toolchain.
+        </Typography>
       </CardContent>
     </Card>
   );

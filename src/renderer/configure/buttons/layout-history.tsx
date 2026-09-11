@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import _ from 'lodash';
 import { makeStyles, Button, Menu, MenuItem, Divider, ListItemIcon, Theme } from '../../mui';
 import { HistoryIcon, StarBorderIcon, DownloadOutlineIcon } from '../../icons';
-import { loadRemoteConfig, loadLocalConfig, useCoreState, useSettingsState } from '../../state';
+import { loadBundledConfig, loadLocalConfig, useCoreState, useSettingsState } from '../../state';
 import { FirmwareResult } from '../../local-storage/firmware';
 
 const useStyles = makeStyles(
@@ -39,12 +39,12 @@ export default function LayoutHistoryButton(props: LayoutHistoryButtonProps) {
 
   const closeMenu = () => setAnchor(null);
 
-  function loadRemote(layout: string) {
+  function loadBundled(layout: string) {
     if (!keyboard || !variant) {
       return;
     }
 
-    loadRemoteConfig(keyboard.keyboard, variant, layout);
+    loadBundledConfig(keyboard.keyboard, variant, layout);
     closeMenu();
   }
 
@@ -79,7 +79,7 @@ export default function LayoutHistoryButton(props: LayoutHistoryButtonProps) {
         classes={{ paper: classes.menu }}
       >
         {layouts.map((layout) => (
-          <MenuItem key={layout} onClick={() => loadRemote(layout)}>
+          <MenuItem key={layout} onClick={() => loadBundled(layout)}>
             <ListItemIcon>
               <StarBorderIcon />
             </ListItemIcon>

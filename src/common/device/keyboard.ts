@@ -122,7 +122,7 @@ function buildDeviceList(): ReadonlyMap<number, ReadonlyMap<number, KnownDevice>
   // const list: (number | [number, boolean, Names[], Variants?])[][] = [
   // const list: (number | VarDef)[][] = [
   const list: { vid: number; devs: VarDef[] }[] = [
-    // Un-official original I:C vid/pid combo
+    // Original shared VID/PID combination
     {
       vid: 0x1c11,
       devs: [
@@ -130,7 +130,7 @@ function buildDeviceList(): ReadonlyMap<number, ReadonlyMap<number, KnownDevice>
         [0xb007, true, [Names.InfinityErgodox, Names.Infinity60, Names.Infinity60Led, Names.WhiteFox, Names.KType]],
       ],
     },
-    // Semi-official I:C shared VID
+    // Community-assigned shared VID
     {
       vid: 0x1209,
       devs: [
@@ -138,7 +138,7 @@ function buildDeviceList(): ReadonlyMap<number, ReadonlyMap<number, KnownDevice>
         [0x01cb, true, [Names.InfinityErgodox, Names.Infinity60, Names.Infinity60Led, Names.WhiteFox, Names.KType]],
       ],
     },
-    // Official I:C VID with unique PIDs
+    // Unique keyboard PIDs
     {
       vid: 0x308f,
       devs: [

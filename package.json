@@ -1,8 +1,8 @@
 {
   "name": "kiibohd-configurator",
   "version": "1.1.0",
-  "description": "Configuration utility for Input Club keyboards",
-  "author": "Jeremy Bondeson <jbondeson@gmail.com> (https://input.club)",
+  "description": "Standalone configuration utility for Kiibohd-compatible keyboards",
+  "author": "Jeremy Bondeson <jbondeson@gmail.com>",
   "license": "GPL-3.0",
   "scripts": {
     "dev": "electron-webpack dev",
@@ -118,7 +118,7 @@
         "tar.gz"
       ],
       "executableName": "kiibohd-configurator",
-      "vendor": "Input Club",
+      "vendor": "Kiibohd",
       "category": "Utility"
     },
     "directories": {
