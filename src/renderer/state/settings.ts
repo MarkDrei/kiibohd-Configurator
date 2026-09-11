@@ -6,6 +6,7 @@ import { findDfuPath } from '../local-storage/dfu-util';
 import { findKiidrvPath } from '../local-storage/kiidrv';
 import { ConfigAnimation } from '../../common/config';
 import { FirmwareResult, normalizeFirmwareResult } from '../local-storage/firmware';
+import { Toolchain } from '../local-storage/compile';
 import { AvailableLocales } from '../../common/keys';
 
 const dev = process.env.NODE_ENV === 'development';
@@ -18,6 +19,7 @@ const DbKey = {
   lastDl: 'last-download',
   recentDls: 'recent-dls',
   cannedAnimations: 'canned-animations',
+  toolchain: 'toolchain',
 };
 
 type SettingsState = {
@@ -28,6 +30,15 @@ type SettingsState = {
   lastDl: Optional<FirmwareResult>;
   recentDls: Dictionary<FirmwareResult[]>;
   cannedAnimations: Dictionary<ConfigAnimation>;
+  toolchain: Toolchain;
+};
+
+const defaultToolchain: Toolchain = {
+  controller: '',
+  kll: '',
+  cmake: 'cmake',
+  python: process.platform === 'win32' ? 'python' : 'python3',
+  extraPath: '',
 };
 
 const initialState: SettingsState = {
@@ -38,6 +49,7 @@ const initialState: SettingsState = {
   lastDl: undefined,
   recentDls: {},
   cannedAnimations: {},
+  toolchain: defaultToolchain,
 };
 
 const {
@@ -55,6 +67,7 @@ export async function loadFromDb() {
   setSettingsState('lastDl', normalizeFirmwareResult(await db.core.get(DbKey.lastDl)));
   setSettingsState('recentDls', (await db.core.get(DbKey.recentDls)) || {});
   setSettingsState('cannedAnimations', (await db.core.get(DbKey.cannedAnimations)) || {});
+  setSettingsState('toolchain', { ...defaultToolchain, ...(await db.core.get<Toolchain>(DbKey.toolchain)) });
   // setSettingsState('locale', (await db.core.get(DbKey.locale)) || 'en-us');
   setSettingsState('dfu', (await db.core.get(DbKey.dfuPath)) || (await findDfuPath()));
 }
@@ -67,6 +80,12 @@ export async function updateDfu(dfu: string) {
 export async function updateKiidrv(kiidrv: string) {
   setSettingsState('kiidrv', kiidrv);
   await db.core.set(DbKey.kiidrvPath, kiidrv);
+}
+
+export async function updateToolchain(update: Partial<Toolchain>) {
+  const updated = { ...getSettingsState('toolchain'), ...update };
+  setSettingsState('toolchain', updated);
+  await db.core.set(DbKey.toolchain, updated);
 }
 
 export async function addDownload(download: FirmwareResult) {

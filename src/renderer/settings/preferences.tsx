@@ -16,7 +16,8 @@ export default function Preferences() {
       <CardHeader title="Standalone mode" />
       <CardContent>
         <Typography className={classes.text}>
-          Keyboard layouts are bundled with the application. Firmware compilation requires a trusted local toolchain.
+          Keyboard layouts are bundled with the application. Firmware is compiled on this machine from local firmware
+          sources, configured under the Firmware tab.
         </Typography>
       </CardContent>
     </Card>

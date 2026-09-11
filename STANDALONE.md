@@ -23,11 +23,14 @@ are optional and are not required to edit layouts.
 - Select a supported keyboard and variant
 - Edit keys, layers, macros, and (where present) visuals
 - Import / export layout JSON from disk
-- Flash a firmware binary you already have on disk (if `dfu-util` is already
-  installed on the machine)
+- Compile firmware, using local checkouts of the controller firmware and the
+  KLL compiler (see below)
+- Flash a firmware binary, either one just compiled or one already on disk
+  (requires `dfu-util`)
 
-Clicking **Flash Keyboard** in the editor is the compile action. It does
-**not** compile. It shows an error on purpose.
+Clicking **Flash Keyboard** in the editor compiles the current layout and then
+offers to flash the result. Everything runs as local processes; no layout ever
+leaves the machine.
 
 ## Bundled layout JSON
 
@@ -43,37 +46,70 @@ File names match `{board}-{layout}.json`, for example `KType-Standard.json`.
 Each file is a KIICONF layout: `header`, `matrix` (keys and layers), plus
 optional `leds`, `macros`, `animations`, `defines`, `custom`, and `canned`.
 
-KiiConf itself is **not** bundled here. It was only the web front-end that
-turned JSON into a firmware build.
+Base layouts named by a layout's `header.Base` field are bundled too. They are
+not offered in the UI; compilation needs them to work out which keys differ
+from stock. See `static/layouts/SOURCE.md`.
 
-## Sibling firmware repos (local forks)
+## Firmware compilation
 
-Firmware compilation is **not wired up** in this app yet. When it is, it
-must use **local clones only**, never a network compile service.
+Compilation happens entirely on this machine. The app converts the layout to
+KLL, then drives CMake against a local checkout of the controller firmware,
+exactly as `Keyboards/<board>.bash` would.
 
-These forks sit next to this repo:
+### Sibling firmware repos (local forks)
 
 | Role | Local path | GitHub fork |
 | --- | --- | --- |
 | This desktop app | `../kiibohd-Configurator` | https://github.com/MarkDrei/kiibohd-Configurator |
 | Keyboard firmware / ARM build scripts | `../kiibohd-Controller` | https://github.com/MarkDrei/kiibohd-Controller |
 | KLL compiler | `../kiibohd-kll` | https://github.com/MarkDrei/kiibohd-kll |
-
-From this directory that is:
-
-```text
-../kiibohd-Controller
-../kiibohd-kll
-```
-
-`kiibohd/controller` (here: Controller) holds `Keyboards/*.bash` and the
-firmware tree. `kiibohd/kll` compiles Key Layout Language. Historical KiiConf
-called those tools from PHP/`build_layout.bash` after converting JSON to KLL.
-A future local compile path should invoke the sibling Controller and kll
-checkouts with a local ARM GCC/cmake/Python toolchain — not HTTP.
+| Historical web front-end, for reference | `../kiibohd-KiiConf` | https://github.com/MarkDrei/KiiConf |
 
 Do not clone or fetch from `input.club`. Prefer these forks and other copies
 you already have on disk.
+
+### Required toolchain
+
+Configure the paths under **Settings > Firmware**. The following have to be
+installed separately:
+
+- CMake, plus `ninja` (preferred) or `make`
+- `arm-none-eabi-gcc`, for the Kinetis and SAM4S targets
+- Python 3 with the `kll` compiler importable, either from the sibling
+  `kiibohd-kll` checkout or installed with pip. `Lib/CMake/kll.cmake` requires
+  at least version `0.5.7.16`.
+- `dfu-util`, for flashing
+
+The **Additional PATH** setting is prepended to `PATH` for builds, which is the
+simplest way to expose the ARM toolchain and `ninja` without changing the
+system environment.
+
+### One network dependency to be aware of
+
+The KLL compiler imports the `layouts` PyPI package and constructs it on every
+compile (`kll/common/stage.py`). That package fetches HID layout data from
+GitHub into a local cache the first time it is used. Populate that cache once
+on a machine you trust, or pin it to a local copy, otherwise a compile will
+reach out to the network.
+
+### How a build is put together
+
+The JSON to KLL conversion is a port of `download.php` from KiiConf, at the
+same revision the bundled layouts came from; it lives in
+`src/common/config/kll.ts`. Each layer becomes `{board}-{layout}-{n}.kll`,
+containing only the keys that differ from the base layout.
+
+Those files are written into the build directory, where
+`Lib/CMake/kll.cmake` picks them up ahead of the layouts shipped with the KLL
+compiler. Per-board CMake settings live in
+`src/common/device/build-targets.ts` and mirror the `Keyboards/*.bash`
+scripts. Split boards, i.e. the Infinity Ergodox, are built twice with
+different base maps and product ids.
+
+Build directories are kept under the app's user data directory in `builds/`,
+keyed by layout and source revision, so rebuilds are incremental. Finished
+firmware is copied into `firmware-cache/` alongside its build log, the
+generated KLL, and the layout that produced it.
 
 ## Build this app (no remote compile server)
 
@@ -91,5 +127,3 @@ yarn dist --dir -c.compression=store -c.mac.identity=null -c.npmRebuild=false
 
 Run `output/win-unpacked/Kiibohd Configurator.exe` (Windows) or the matching
 unpacked binary for your OS.
-
-`yarn dev` starts the UI only. It does not start a firmware compiler.

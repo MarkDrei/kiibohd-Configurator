@@ -18,9 +18,10 @@ Default keyboard layouts are bundled in `static/layouts`; the application does n
 
 # --> [Wiki](https://kiibohd.github.io/wiki/#/Quickstart) <-- If you have questions start here
 
-Firmware compilation is intentionally unavailable until a trusted local
-compiler integration is provided. Existing local firmware files can still be
-flashed.
+Firmware is compiled locally, from your own checkouts of the controller
+firmware and the KLL compiler. Configure the toolchain under
+`Settings > Firmware`; see [STANDALONE.md](STANDALONE.md) for what needs to be
+installed. Existing local firmware files can still be flashed directly.
 
 
 ## Supported Keyboards

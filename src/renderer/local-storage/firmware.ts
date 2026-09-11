@@ -4,8 +4,10 @@ import fs from 'fs';
 import mkdirp from 'mkdirp';
 import { paths } from '../env';
 import Bluebird from 'bluebird';
+import { KllFile } from '../../common/config';
 
 const writeFile = Bluebird.promisify(fs.writeFile);
+const copyFile = Bluebird.promisify(fs.copyFile);
 
 export interface FileDescription {
   board: string;
@@ -131,6 +133,80 @@ export async function storeFirmware(
     ...{
       type: 'single',
       bin: await extract(binFile, undefined, true),
+    },
+  };
+}
+
+export interface BuildOutput {
+  board: string;
+  variant: string;
+  layout: string;
+  hash: string;
+  /** Layout that was compiled, stored so the build can be reopened later. */
+  config: unknown;
+  log: string;
+  kll: KllFile[];
+  /** Compiled binaries, keyed by side. A single sided board uses ''. */
+  bins: { side: '' | 'left' | 'right'; path: string }[];
+}
+
+/**
+ * Store the output of a local firmware build in the local cache, in the same
+ * layout `storeFirmware` produces for downloaded firmware.
+ */
+export async function storeBuildOutput(output: BuildOutput): Promise<FirmwareResult> {
+  const { board, variant, layout, hash, bins } = output;
+  const outdir = path.join(paths.firmwareCache, `${board}_${layout}_${hash}`);
+
+  await mkdirp(outdir);
+
+  const write = async (name: string, data: string) => {
+    const outpath = path.join(outdir, name);
+    await writeFile(outpath, data);
+    return outpath;
+  };
+
+  const copy = async (name: string, from: string) => {
+    const outpath = path.join(outdir, name);
+    await copyFile(from, outpath);
+    return outpath;
+  };
+
+  for (const file of output.kll) {
+    await write(file.name, file.content);
+  }
+
+  const result: BaseFirmwareResult = {
+    board,
+    variant,
+    layout,
+    hash,
+    isError: false,
+    json: await write(`${board}-${layout}.json`, JSON.stringify(output.config, null, 2)),
+    log: await write('build.log', output.log),
+    time: Date.now(),
+  };
+
+  const single = bins.find((b) => b.side === '');
+  if (single) {
+    return { ...result, ...{ type: 'single', bin: await copy(binFile, single.path) } };
+  }
+
+  const left = bins.find((b) => b.side === 'left');
+  const right = bins.find((b) => b.side === 'right');
+
+  if (!left || !right) {
+    throw Error('Build did not produce firmware for both halves');
+  }
+
+  return {
+    ...result,
+    ...{
+      type: 'split',
+      bin: {
+        left: await copy('left_' + binFile, left.path),
+        right: await copy('right_' + binFile, right.path),
+      },
     },
   };
 }
