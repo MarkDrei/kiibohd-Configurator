@@ -21,7 +21,9 @@ Default keyboard layouts are bundled in `static/layouts`; the application does n
 Firmware is compiled locally, from your own checkouts of the controller
 firmware and the KLL compiler. Configure the toolchain under
 `Settings > Firmware`; see [STANDALONE.md](STANDALONE.md) for what needs to be
-installed. Existing local firmware files can still be flashed directly.
+installed and how to use it. On Windows the build runs inside WSL, because the
+firmware's build scripts expect a posix shell. Existing local firmware files
+can still be flashed directly.
 
 
 ## Supported Keyboards

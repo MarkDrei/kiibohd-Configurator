@@ -32,6 +32,67 @@ Clicking **Flash Keyboard** in the editor compiles the current layout and then
 offers to flash the result. Everything runs as local processes; no layout ever
 leaves the machine.
 
+## Usage
+
+### Setting up, once
+
+1. Clone the sibling repos next to this one, plus
+   [hid-io/layouts](https://github.com/hid-io/layouts). See the table under
+   *Firmware compilation*.
+2. Install the toolchain. On Windows that means installing it inside WSL; see
+   *Building on Windows* for the exact package list.
+3. Open **Settings > Firmware** and fill in the paths. A working Windows
+   setup looks like this:
+
+   | Setting | Value |
+   | --- | --- |
+   | Build in WSL | on |
+   | WSL distribution | empty, or e.g. `Ubuntu` |
+   | Controller firmware | `C:\...\kiibohd-Controller` |
+   | KLL compiler | `C:\...\kiibohd-kll` |
+   | HID layouts | `C:\...\layouts` |
+   | CMake | `cmake` |
+   | Python 3 | `/home/<user>/.kiibohd/venv/bin/python3` |
+   | Additional PATH | empty |
+
+   The checkouts stay on the Windows side; only Python and the build tools
+   come from WSL.
+4. On Windows, install the flashing driver from **Settings > Drivers**.
+
+### Changing a layout
+
+Pick the keyboard and variant, edit keys, layers, macros or visuals, then
+click **Flash Keyboard**. That compiles the current layout and streams the
+build log into a dialog; when it finishes, **Flash** hands the result to the
+flashing panel. The Infinity Ergodox produces two binaries and both halves are
+flashed, one at a time.
+
+A build takes roughly a minute from cold and less on repeat, since each layout
+keeps its own build directory.
+
+### Changing the firmware itself
+
+Edit C sources in the controller checkout and press **Flash Keyboard** again.
+The build directory is reused, so only what changed is recompiled.
+
+Note that the build identity is derived from the layout plus the *committed*
+revision of the controller and KLL checkouts. Uncommitted firmware changes
+therefore land in the same firmware cache entry rather than a new one, which
+is usually what you want while iterating, but means the cache no longer
+distinguishes those builds.
+
+Under the app's user data directory, `%APPDATA%\kiibohd-configurator` on
+Windows:
+
+- `builds/<board>-<layout>-<hash>/` is the CMake build tree, containing the
+  generated `.kll` layer files and, for a WSL build, the `build.sh` that ran.
+  Running that script by hand reproduces the build exactly.
+- `firmware-cache/<board>_<layout>_<hash>/` holds the finished binaries, the
+  full build log, and the layout JSON that produced them.
+
+To debug a failing build, run the `build.sh` of the half that failed; it is
+plain shell and prints every command.
+
 ## Bundled layout JSON
 
 Default layouts live in `static/layouts/` inside this repo (copied into the
