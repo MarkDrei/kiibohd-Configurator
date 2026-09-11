@@ -16,6 +16,8 @@ export interface Toolchain {
   controller: string;
   /** Checkout of https://github.com/kiibohd/kll. Optional if kll is installed. */
   kll: string;
+  /** Checkout of https://github.com/hid-io/layouts, read by the kll compiler. */
+  layouts: string;
   cmake: string;
   python: string;
   /** Prepended to PATH for the build, e.g. the ARM toolchain's bin directory. */
@@ -113,12 +115,16 @@ function detectGenerator(env: NodeJS.ProcessEnv): string {
 }
 
 function buildEnvironment(toolchain: Toolchain): NodeJS.ProcessEnv {
-  if (!toolchain.extraPath) {
-    return process.env;
+  const env = { ...process.env };
+
+  if (toolchain.extraPath) {
+    env.PATH = `${toolchain.extraPath}${path.delimiter}${process.env.PATH ?? ''}`;
   }
 
-  const current = process.env.PATH ?? '';
-  return { ...process.env, PATH: `${toolchain.extraPath}${path.delimiter}${current}` };
+  // Without this the kll compiler downloads HID layouts from GitHub
+  env.KLL_LAYOUTS_PATH = toolchain.layouts;
+
+  return env;
 }
 
 /** Layer arguments as the compile server built them, i.e. `<extra> <layer>`. */
@@ -207,6 +213,16 @@ async function assertToolchain(toolchain: Toolchain) {
 
   if (toolchain.kll && !fs.existsSync(path.join(toolchain.kll, 'kll', 'kll'))) {
     throw new CompileError(`'${toolchain.kll}' does not look like a kll compiler checkout.`);
+  }
+
+  // The kll compiler falls back to downloading these from GitHub, which this
+  // application will not do on the user's behalf.
+  if (!toolchain.layouts) {
+    throw new CompileError('No HID layouts directory is configured. See Settings > Firmware.');
+  }
+
+  if (!fs.existsSync(toolchain.layouts)) {
+    throw new CompileError(`The HID layouts directory '${toolchain.layouts}' does not exist.`);
   }
 }
 

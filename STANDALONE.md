@@ -65,6 +65,10 @@ exactly as `Keyboards/<board>.bash` would.
 | KLL compiler | `../kiibohd-kll` | https://github.com/MarkDrei/kiibohd-kll |
 | Historical web front-end, for reference | `../kiibohd-KiiConf` | https://github.com/MarkDrei/KiiConf |
 
+The KLL compiler also needs the HID layout definitions from
+[hid-io/layouts](https://github.com/hid-io/layouts). Clone it next to the
+others and point the app at it; see below.
+
 Do not clone or fetch from `input.club`. Prefer these forks and other copies
 you already have on disk.
 
@@ -78,19 +82,22 @@ installed separately:
 - Python 3 with the `kll` compiler importable, either from the sibling
   `kiibohd-kll` checkout or installed with pip. `Lib/CMake/kll.cmake` requires
   at least version `0.5.7.16`.
+- A checkout of `hid-io/layouts`
 - `dfu-util`, for flashing
 
 The **Additional PATH** setting is prepended to `PATH` for builds, which is the
 simplest way to expose the ARM toolchain and `ninja` without changing the
 system environment.
 
-### One network dependency to be aware of
+### Why the HID layouts directory is required
 
-The KLL compiler imports the `layouts` PyPI package and constructs it on every
-compile (`kll/common/stage.py`). That package fetches HID layout data from
-GitHub into a local cache the first time it is used. Populate that cache once
-on a machine you trust, or pin it to a local copy, otherwise a compile will
-reach out to the network.
+The KLL compiler constructs the `layouts` PyPI package on every compile
+(`kll/common/stage.py`), and that package downloads the `hid-io/layouts`
+repository from GitHub when it is not given a local path. The `kiibohd-kll`
+fork adds `--layouts-path` and the `KLL_LAYOUTS_PATH` environment variable for
+this; the app sets the environment variable from the **HID layouts** setting,
+and refuses to build without it. Given a path, `layouts-python` never contacts
+GitHub.
 
 ### How a build is put together
 

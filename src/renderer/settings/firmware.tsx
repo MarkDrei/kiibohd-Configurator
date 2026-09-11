@@ -100,6 +100,14 @@ export default function Firmware() {
           value={toolchain.kll}
         />
         <PathField
+          required
+          directory
+          label="HID layouts"
+          helperText="Checkout of hid-io/layouts. Required, as the kll compiler otherwise downloads it from GitHub."
+          field="layouts"
+          value={toolchain.layouts}
+        />
+        <PathField
           label="CMake"
           helperText="cmake executable. A build tool is also needed: ninja (preferred) or make."
           field="cmake"

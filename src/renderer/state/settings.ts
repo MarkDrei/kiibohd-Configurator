@@ -36,6 +36,7 @@ type SettingsState = {
 const defaultToolchain: Toolchain = {
   controller: '',
   kll: '',
+  layouts: '',
   cmake: 'cmake',
   python: process.platform === 'win32' ? 'python' : 'python3',
   extraPath: '',
