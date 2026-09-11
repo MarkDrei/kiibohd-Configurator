@@ -33,13 +33,18 @@ type SettingsState = {
   toolchain: Toolchain;
 };
 
+// The firmware's build scripts assume a posix shell, so windows builds go through WSL
+const wsl = process.platform === 'win32';
+
 const defaultToolchain: Toolchain = {
   controller: '',
   kll: '',
   layouts: '',
   cmake: 'cmake',
-  python: process.platform === 'win32' ? 'python' : 'python3',
+  python: 'python3',
   extraPath: '',
+  wsl,
+  wslDistro: '',
 };
 
 const initialState: SettingsState = {

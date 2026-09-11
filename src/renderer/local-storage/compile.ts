@@ -22,6 +22,14 @@ export interface Toolchain {
   python: string;
   /** Prepended to PATH for the build, e.g. the ARM toolchain's bin directory. */
   extraPath: string;
+  /**
+   * Build inside WSL. The firmware's cmake files run bash helper scripts as
+   * `/usr/bin/env bash` and redirect to /dev/null, neither of which works when
+   * cmake drives the build through cmd.exe.
+   */
+  wsl: boolean;
+  /** Distribution to build in. Empty uses the default distribution. */
+  wslDistro: string;
 }
 
 export interface CompileOptions {
@@ -115,6 +123,11 @@ function detectGenerator(env: NodeJS.ProcessEnv): string {
 }
 
 function buildEnvironment(toolchain: Toolchain): NodeJS.ProcessEnv {
+  // A WSL build gets its environment from the script it runs
+  if (toolchain.wsl) {
+    return process.env;
+  }
+
   const env = { ...process.env };
 
   if (toolchain.extraPath) {
@@ -137,18 +150,39 @@ function cmakePath(value: string): string {
   return value.replace(/\\/g, '/');
 }
 
-function cmakeArguments(
-  target: BuildTarget,
-  kll: KllLayout,
-  extraMap: string,
-  toolchain: Toolchain,
-  generator: string
-): string[] {
+/**
+ * How the build refers to the configured paths. A WSL build cannot use them
+ * directly, so it refers to variables that its script resolves with wslpath.
+ */
+interface ToolchainRefs {
+  controller: string;
+  kll: string;
+  python: string;
+  generator: string;
+}
+
+const wslRefs: ToolchainRefs = {
+  controller: '$CONTROLLER',
+  kll: '$KLL',
+  python: '$PYTHON',
+  generator: '$GENERATOR',
+};
+
+function nativeRefs(toolchain: Toolchain, env: NodeJS.ProcessEnv): ToolchainRefs {
+  return {
+    controller: cmakePath(toolchain.controller),
+    kll: cmakePath(toolchain.kll),
+    python: cmakePath(toolchain.python),
+    generator: detectGenerator(env),
+  };
+}
+
+function cmakeArguments(target: BuildTarget, kll: KllLayout, extraMap: string, refs: ToolchainRefs): string[] {
   const [defaultLayer, ...partialLayers] = kll.layers;
 
   const args = [
     '-G',
-    generator,
+    refs.generator,
     `-DCHIP=${target.chip}`,
     `-DCOMPILER=${target.compiler}`,
     `-DScanModule=${target.scanModule}`,
@@ -167,22 +201,81 @@ function cmakeArguments(
     '-DCONFIGURATOR=1',
   ];
 
-  if (toolchain.python) {
-    args.push(`-DPYTHON_EXECUTABLE=${cmakePath(toolchain.python)}`);
+  if (refs.python) {
+    args.push(`-DPYTHON_EXECUTABLE=${refs.python}`);
   }
 
-  if (toolchain.kll) {
+  if (refs.kll) {
     // KLL_EXECUTABLE is a command, not a path, so it is passed as a cmake list.
     // Lib/CMake/kll.cmake only derives the working directory when it locates the
     // compiler itself, so that has to be supplied alongside it.
-    const compiler = cmakePath(path.join(toolchain.kll, 'kll', 'kll'));
-    args.push(`-DKLL_EXECUTABLE=${cmakePath(toolchain.python) || 'python3'};${compiler}`);
-    args.push(`-DKLL_WORKING_DIRECTORY=${cmakePath(toolchain.kll)}`);
+    args.push(`-DKLL_EXECUTABLE=${refs.python || 'python3'};${refs.kll}/kll/kll`);
+    args.push(`-DKLL_WORKING_DIRECTORY=${refs.kll}`);
   }
 
-  args.push(cmakePath(toolchain.controller));
+  args.push(refs.controller);
 
   return args;
+}
+
+/** Whether a configured path refers to something this process can see. */
+function isWindowsPath(value: string): boolean {
+  return /^[a-z]:[\\/]/i.test(value) || value.includes('\\');
+}
+
+/** A shell expression for a configured path, translating Windows paths. */
+function wslPath(value: string): string {
+  return isWindowsPath(value) ? `$(wslpath -a '${value}')` : `'${value}'`;
+}
+
+function shellArgument(value: string): string {
+  // Arguments naming a variable the script sets have to stay expandable
+  return value.includes('$') ? `"${value}"` : `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * The build as a shell script, so that neither Windows nor wsl.exe gets a say
+ * in quoting. It is left in the build directory and can be run by hand.
+ */
+function buildScript(toolchain: Toolchain, args: string[]): string {
+  const cmake = shellArgument(toolchain.cmake);
+
+  const lines = [
+    '#!/usr/bin/env bash',
+    '# Written by the Kiibohd Configurator.',
+    'set -e',
+    '',
+    `CONTROLLER=${wslPath(toolchain.controller)}`,
+    `PYTHON=${toolchain.python ? wslPath(toolchain.python) : "'python3'"}`,
+    `export KLL_LAYOUTS_PATH=${wslPath(toolchain.layouts)}`,
+  ];
+
+  if (toolchain.kll) {
+    lines.push(`KLL=${wslPath(toolchain.kll)}`);
+  }
+
+  if (toolchain.extraPath) {
+    lines.push(`export PATH=${wslPath(toolchain.extraPath)}:$PATH`);
+  }
+
+  lines.push(
+    '',
+    'if command -v ninja > /dev/null; then',
+    '\tGENERATOR=Ninja',
+    'elif command -v make > /dev/null; then',
+    "\tGENERATOR='Unix Makefiles'",
+    'else',
+    "\techo 'No build tool found. Install ninja-build (preferred) or make.' >&2",
+    '\texit 1',
+    'fi',
+    '',
+    'set -x',
+    [cmake, ...args.map(shellArgument)].join(' \\\n\t'),
+    `${cmake} --build .`,
+    ''
+  );
+
+  return lines.join('\n');
 }
 
 async function loadBaseLayout(board: string, config: PersistedConfig): Promise<PersistedConfig> {
@@ -202,16 +295,43 @@ async function loadBaseLayout(board: string, config: PersistedConfig): Promise<P
   }
 }
 
+const BUILD_SCRIPT = 'build.sh';
+
+async function runBuild(
+  toolchain: Toolchain,
+  buildDir: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  onLog: (chunk: string) => void
+) {
+  if (!toolchain.wsl) {
+    await run(toolchain.cmake, args, buildDir, env, onLog);
+    await run(toolchain.cmake, ['--build', '.'], buildDir, env, onLog);
+    return;
+  }
+
+  await writeFile(path.join(buildDir, BUILD_SCRIPT), buildScript(toolchain, args));
+
+  const distro = toolchain.wslDistro ? ['-d', toolchain.wslDistro] : [];
+
+  // --cd takes the windows path as is, so the build happens where the layer
+  // files were written and the firmware lands somewhere this process can read.
+  await run('wsl.exe', [...distro, '--cd', buildDir, '--', 'bash', `./${BUILD_SCRIPT}`], buildDir, env, onLog);
+}
+
 async function assertToolchain(toolchain: Toolchain) {
+  // Paths inside the WSL filesystem cannot be checked from here
+  const visible = (value: string) => !toolchain.wsl || isWindowsPath(value);
+
   if (!toolchain.controller) {
     throw new CompileError('No controller firmware directory is configured. See Settings > Firmware.');
   }
 
-  if (!fs.existsSync(path.join(toolchain.controller, 'CMakeLists.txt'))) {
+  if (visible(toolchain.controller) && !fs.existsSync(path.join(toolchain.controller, 'CMakeLists.txt'))) {
     throw new CompileError(`'${toolchain.controller}' does not look like a controller firmware checkout.`);
   }
 
-  if (toolchain.kll && !fs.existsSync(path.join(toolchain.kll, 'kll', 'kll'))) {
+  if (toolchain.kll && visible(toolchain.kll) && !fs.existsSync(path.join(toolchain.kll, 'kll', 'kll'))) {
     throw new CompileError(`'${toolchain.kll}' does not look like a kll compiler checkout.`);
   }
 
@@ -221,7 +341,7 @@ async function assertToolchain(toolchain: Toolchain) {
     throw new CompileError('No HID layouts directory is configured. See Settings > Firmware.');
   }
 
-  if (!fs.existsSync(toolchain.layouts)) {
+  if (visible(toolchain.layouts) && !fs.existsSync(toolchain.layouts)) {
     throw new CompileError(`The HID layouts directory '${toolchain.layouts}' does not exist.`);
   }
 }
@@ -250,7 +370,7 @@ export async function compileFirmware(options: CompileOptions): Promise<Firmware
   const hash = layoutHash(kll, revisions.join(''));
 
   const env = buildEnvironment(toolchain);
-  const generator = detectGenerator(env);
+  const refs = toolchain.wsl ? wslRefs : nativeRefs(toolchain, env);
   const files = kll.layers.filter((f): f is KllFile => !!f);
 
   onLog(`Building ${kll.name} (${hash})\n`);
@@ -269,8 +389,7 @@ export async function compileFirmware(options: CompileOptions): Promise<Firmware
       onLog(`\n=== ${target.side} half ===\n`);
     }
 
-    await run(toolchain.cmake, cmakeArguments(target, kll, extraMap, toolchain, generator), buildDir, env, onLog);
-    await run(toolchain.cmake, ['--build', '.'], buildDir, env, onLog);
+    await runBuild(toolchain, buildDir, cmakeArguments(target, kll, extraMap, refs), env, onLog);
 
     const bin = path.join(buildDir, 'kiibohd.dfu.bin');
 

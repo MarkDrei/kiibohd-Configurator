@@ -89,6 +89,41 @@ The **Additional PATH** setting is prepended to `PATH` for builds, which is the
 simplest way to expose the ARM toolchain and `ninja` without changing the
 system environment.
 
+### Building on Windows
+
+The firmware's CMake files run bash helper scripts as `/usr/bin/env bash` and
+redirect to `/dev/null`, which cmd.exe cannot do, so **Build in WSL** is on by
+default on Windows. The app writes the build as a `build.sh` into the build
+directory and runs it with `wsl.exe --cd <build dir> -- bash ./build.sh`.
+Generating a script avoids arguments being mangled on the way through
+`wsl.exe`, and the script can be run by hand to reproduce a build.
+
+Paths configured in the settings may be on either side of the boundary.
+Windows paths are translated inside the script with `wslpath`, so the usual
+arrangement of checkouts on a Windows drive works as is. Flashing is unchanged
+and still happens on the Windows side, so `dfu-util` is needed there rather
+than in WSL.
+
+Setting up a distribution, tested on Ubuntu 24.04:
+
+```bash
+sudo apt install cmake ninja-build make gcc-arm-none-eabi \
+	binutils-arm-none-eabi libnewlib-arm-none-eabi dfu-util python3-venv
+
+# the kll compiler's dependencies, kept out of the system python
+python3 -m venv ~/.kiibohd/venv
+~/.kiibohd/venv/bin/pip install layouts GitPython packaging
+```
+
+Then set **Python 3** to `~/.kiibohd/venv/bin/python3` (written out in full).
+
+One thing to watch for: if a checkout was made with `core.autocrlf=true`, the
+firmware's shell scripts end up with carriage returns and the build dies at
+link time with `/usr/bin/env: 'bash\r': No such file or directory`. The
+`kiibohd-Controller` fork carries a `.gitattributes` that keeps those scripts
+LF; an older checkout can be repaired with `git rm --cached -r .` followed by
+`git reset --hard`.
+
 ### Why the HID layouts directory is required
 
 The KLL compiler constructs the `layouts` PyPI package on every compile
