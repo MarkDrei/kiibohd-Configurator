@@ -1,15 +1,14 @@
 name: Release
 
+# This packaging pipeline has never run on this fork and cannot succeed as
+# written: windows-2016 is retired, artifact actions v1 are shut off, and
+# actions/create-release is archived. Do not run it on push (that would fail
+# every CI). Rewrite before using; until then it is dispatch-only.
 on:
+  workflow_dispatch:
   repository_dispatch:
   release:
     types: [created, unpublished, prereleased]
-  # This is currently a bit overkill to do the full release on every push, but since it re-uses draft releases shouldn't be too bad.
-  push:
-    branches:
-      - master
-      - 'release-**'
-      - 'feature-**'
 
 jobs:
   draft_release:
